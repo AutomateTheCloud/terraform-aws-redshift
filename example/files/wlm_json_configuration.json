@@ -1,0 +1,28 @@
+[
+  {
+    "query_group":[
+      "reports"
+    ],
+    "query_group_wild_card":0,
+    "query_concurrency":4,
+    "max_execution_time":20000,
+    "memory_percent_to_use":25
+  },
+  {
+    "user_group":[
+      "admin",
+      "dba"
+    ],
+    "user_group_wild_card":1,
+    "query_concurrency":5,
+    "memory_percent_to_use":40
+  },
+  {
+    "query_concurrency":5,
+    "memory_percent_to_use":35
+  },
+  {
+    "short_query_queue":true,
+    "max_execution_time":5000
+  }
+]
