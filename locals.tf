@@ -1,28 +1,70 @@
+# Copyright 2025 Automate the Cloud Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 locals {
-  alarm = {
-    cpu_utilization = {
-      critical = try(var.alarm.cpu_utilization.critical, 90)
-      warning  = try(var.alarm.cpu_utilization.warning, 80)
+  # Without a password of the caller's own, Amazon Redshift keeps one in Secrets Manager.
+  # Decided from whether the input is null, so a password created in the same run still
+  # plans. Whether a password was given is not secret; without nonsensitive(), the
+  # sensitive mark of master_password would make the whole metadata output sensitive.
+  manage_master_password = nonsensitive(var.master_password == null)
+
+  # The module's parameters, then the caller's, which win. Both are always set, to true or
+  # false: a parameter left out of the group later keeps its value in AWS, and every plan
+  # would try to remove it again.
+  parameters = merge(
+    {
+      require_ssl                  = "true"
+      enable_user_activity_logging = var.logging.destination != null && contains(var.logging.log_exports, "useractivitylog") ? "true" : "false"
+    },
+    var.parameter_group.parameters,
+  )
+
+  # One log group per log sent to CloudWatch Logs, keyed by the log's name.
+  cloudwatch_log_groups = var.logging.destination == "cloudwatch" ? var.logging.log_exports : toset([])
+
+  sns_topics = var.alarms.enabled ? toset(["critical", "warning"]) : toset([])
+
+  # The alarms, keyed by a fixed name, from the inputs alone.
+  alarms = var.alarms.enabled ? {
+    health-critical = {
+      topic       = "critical"
+      metric      = "HealthStatus"
+      comparison  = "LessThanThreshold"
+      threshold   = 1
+      periods     = 5
+      description = "The cluster has reported itself unhealthy for 5 minutes."
     }
-    free_storage_space = {
-      critical = try(var.alarm.free_storage_space.critical, 90)
-      warning  = try(var.alarm.free_storage_space.warning, 80)
+    cpu-critical = {
+      topic       = "critical"
+      metric      = "CPUUtilization"
+      comparison  = "GreaterThanThreshold"
+      threshold   = var.alarms.cpu_utilization.critical
+      periods     = 5
+      description = "Average CPU use has been above ${var.alarms.cpu_utilization.critical}% for 5 minutes."
     }
-  }
-
-  kms_key_id = try(var.encryption.enabled, true) ? try(var.encryption.kms_key_id, "alias/aws/redshift") : null
-
-  parameter_group = {
-    name = try(var.parameter_group.existing, null) != null ? var.parameter_group.existing : aws_redshift_parameter_group.this[0].name
-  }
-
-  subnet_group = {
-    name = try(var.cluster_subnet_group.existing, null) != null ? var.cluster_subnet_group.existing : aws_redshift_subnet_group.this[0].name
-  }
-
-  subnet = {
-    ids = try(var.cluster_subnet_group.subnet_network_tag, "") != "" ? distinct(compact(concat(tolist(data.aws_subnets.this[0].ids), try(var.cluster_subnet_group.subnets, [])))) : var.cluster_subnet_group.subnets
-  }
-
-  master_password = try(var.credentials.master.password, null) != null ? var.credentials.master.password : random_password.master_password.result
+    cpu-warning = {
+      topic       = "warning"
+      metric      = "CPUUtilization"
+      comparison  = "GreaterThanThreshold"
+      threshold   = var.alarms.cpu_utilization.warning
+      periods     = 5
+      description = "Average CPU use has been above ${var.alarms.cpu_utilization.warning}% for 5 minutes."
+    }
+    disk-critical = {
+      topic       = "critical"
+      metric      = "PercentageDiskSpaceUsed"
+      comparison  = "GreaterThanOrEqualToThreshold"
+      threshold   = var.alarms.disk_space_used.critical
+      periods     = 30
+      description = "At least ${var.alarms.disk_space_used.critical}% of the disk space has been in use for 30 minutes."
+    }
+    disk-warning = {
+      topic       = "warning"
+      metric      = "PercentageDiskSpaceUsed"
+      comparison  = "GreaterThanOrEqualToThreshold"
+      threshold   = var.alarms.disk_space_used.warning
+      periods     = 30
+      description = "At least ${var.alarms.disk_space_used.warning}% of the disk space has been in use for 30 minutes."
+    }
+  } : {}
 }

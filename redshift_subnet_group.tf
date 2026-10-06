@@ -1,14 +1,11 @@
-resource "aws_redshift_subnet_group" "this" {
-  count       = try(var.cluster_subnet_group.existing, null) != null ? 0 : 1
-  name        = var.name
-  description = "${local.scope.name} - ${local.purpose.name} (${local.environment.abbr}) [${local.aws.region.name}]: ${var.name}"
-  subnet_ids  = local.subnet.ids
+# Copyright 2025 Automate the Cloud Inc.
+# SPDX-License-Identifier: Apache-2.0
 
-  tags = merge(
-    local.tags,
-    tomap({
-      "Name" = var.name
-    })
-  )
-  provider = aws.this
+resource "aws_redshift_subnet_group" "this" {
+  region      = var.region
+  name        = var.name
+  description = "Redshift cluster ${var.name}"
+  subnet_ids  = var.subnet_ids
+
+  tags = merge(local.tags, { Name = var.name })
 }

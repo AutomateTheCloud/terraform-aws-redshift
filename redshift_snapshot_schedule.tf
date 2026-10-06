@@ -1,8 +1,13 @@
+# Copyright 2025 Automate the Cloud Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 resource "aws_redshift_snapshot_schedule" "this" {
-  count       = try(var.backup.schedule, null) != null ? 1 : 0
+  count = length(var.backup.schedules) > 0 ? 1 : 0
+
+  region      = var.region
   identifier  = var.name
-  description = var.name
-  definitions = [var.backup.schedule]
-  tags        = local.tags
-  provider    = aws.this
+  description = "Redshift cluster ${var.name}"
+  definitions = var.backup.schedules
+
+  tags = local.tags
 }

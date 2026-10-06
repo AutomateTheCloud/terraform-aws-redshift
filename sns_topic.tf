@@ -1,73 +1,13 @@
-resource "aws_sns_topic" "critical" {
-  name         = "rs-${var.name}-critical"
-  display_name = "rs-${var.name}-critical"
-  tags = merge(
-    local.tags,
-    tomap({
-      "Name" = "rs-${var.name}-critical"
-    })
-  )
-  provider = aws.this
-}
+# Copyright 2025 Automate the Cloud Inc.
+# SPDX-License-Identifier: Apache-2.0
 
-resource "aws_sns_topic_policy" "critical" {
-  arn      = aws_sns_topic.critical.arn
-  policy   = data.aws_iam_policy_document.sns_topic-critical.json
-  provider = aws.this
-}
+# The topics the alarms notify. Subscribe to them to receive the notifications.
+resource "aws_sns_topic" "this" {
+  for_each = local.sns_topics
 
-data "aws_iam_policy_document" "sns_topic-critical" {
-  statement {
-    effect = "Allow"
-    principals {
-      type = "Service"
-      identifiers = [
-        "cloudwatch.amazonaws.com"
-      ]
-    }
-    actions = [
-      "sns:Publish",
-    ]
-    resources = [
-      aws_sns_topic.critical.arn
-    ]
-  }
-  provider = aws.this
-}
+  region            = var.region
+  name              = "${var.name}-redshift-${each.key}"
+  kms_master_key_id = var.alarms.sns_kms_key_id
 
-resource "aws_sns_topic" "warning" {
-  name         = "rs-${var.name}-warning"
-  display_name = "rs-${var.name}-warning"
-  tags = merge(
-    local.tags,
-    tomap({
-      "Name" = "rs-${var.name}-warning"
-    })
-  )
-  provider = aws.this
-}
-
-resource "aws_sns_topic_policy" "warning" {
-  arn      = aws_sns_topic.warning.arn
-  policy   = data.aws_iam_policy_document.sns_topic-warning.json
-  provider = aws.this
-}
-
-data "aws_iam_policy_document" "sns_topic-warning" {
-  statement {
-    effect = "Allow"
-    principals {
-      type = "Service"
-      identifiers = [
-        "cloudwatch.amazonaws.com"
-      ]
-    }
-    actions = [
-      "sns:Publish",
-    ]
-    resources = [
-      aws_sns_topic.warning.arn
-    ]
-  }
-  provider = aws.this
+  tags = merge(local.tags, { Name = "${var.name}-redshift-${each.key}" })
 }

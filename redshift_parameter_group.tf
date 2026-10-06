@@ -1,30 +1,26 @@
+# Copyright 2025 Automate the Cloud Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# The family is part of the name, so that a new family creates a new group first and the
+# cluster moves to it before the old one, which the cluster still uses, is deleted. The
+# description is fixed for the same reason: changing it replaces the group.
 resource "aws_redshift_parameter_group" "this" {
-  count       = try(var.parameter_group.existing, null) != null ? 0 : 1
-  name        = var.name
-  description = "${local.scope.name} - ${local.purpose.name} (${local.environment.abbr}) [${local.aws.region.name}]: ${var.name}"
-  family      = try(var.parameter_group.family, null)
+  region      = var.region
+  name        = "${var.name}-${replace(var.parameter_group.family, ".", "-")}"
+  description = "Redshift cluster ${var.name}"
+  family      = var.parameter_group.family
 
   dynamic "parameter" {
-    for_each = try(var.parameter_group.parameter, [])
+    for_each = local.parameters
     content {
-      name  = parameter.value.name
-      value = parameter.value.value
-    }
-  }
-  dynamic "parameter" {
-    for_each = try(var.parameter_group.wlm_configuration_json_file, null) != null ? [1] : []
-    content {
-      name = "wlm_json_configuration"
-      # When encoding strings, this function escapes some characters using Unicode escape sequences: replacing <, >, &, U+2028, and U+2029 with \u003c, \u003e, \u0026, \u2028, and \u2029. This is to preserve compatibility with Terraform 0.11 behavior
-      value = try(replace(replace(jsonencode(jsondecode(file(var.parameter_group.wlm_configuration_json_file))), "\\u003e", ">"), "\\u003c", "<"), null)
+      name  = parameter.key
+      value = parameter.value
     }
   }
 
-  tags = merge(
-    local.tags,
-    tomap({
-      "Name" = var.name
-    })
-  )
-  provider = aws.this
+  tags = merge(local.tags, { Name = var.name })
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
